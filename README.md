@@ -2,6 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.5%2B-blue.svg)](https://www.python.org)
 
+
 ### 使用方法：
 
 1. 安装`Python` (3.5 或更高版本）
@@ -25,21 +26,7 @@
 
 #### 方式一：
 
-通过第三方登录的方式，登录了[绑定的 QQ 帐号](https://safe.jd.com/union/index.action)，也就登录了京东。
-
-在登录 QQ 时有时会出现需要输入验证码的情况，若是在 [iTerm2](http://www.iterm2.com/) 中运行，验证码图片会显示在终端中，直接输入即可；否则会调用系统关联应用打开验证码图片。
-
-![通过 QQ 登录](docs/qq.png)
-
-
-#### 方式二：
-
-（需切换到`qt-browser`分支，并安装[`PyQt5`](https://pypi.python.org/pypi/PyQt5)）
-
-```sh
-git checkout qt-browser
-pip install -r requirements.txt
-```
+> 2017-08-13 更新：即现在的默认分支`browser`。
 
 借助内置浏览器登录。本方式中使用 `PyQt5` 的 `WebEngine` 构建了个简易浏览器，在其中登录京东即可。
 
@@ -48,9 +35,22 @@ pip install -r requirements.txt
 ![浏览器方式登录](docs/browser.png)
 
 
+#### 方式二：
+
+> 2017-08-13 更新：目前此方式[依赖的包](https://github.com/gera2ld/qqlib)存在一些问题，暂不可用，请使用「浏览器方式」登录。
+
+通过第三方登录的方式，登录了[绑定的 QQ 帐号](https://safe.jd.com/union/index.action)，也就登录了京东。
+
+在登录 QQ 时有时会出现需要输入验证码的情况，若是在 [iTerm2](http://www.iterm2.com/) 中运行，验证码图片会显示在终端中，直接输入即可；否则会调用系统关联应用打开验证码图片。
+
+![通过 QQ 登录](docs/qq.png)
+
+
 ## 其他
 
 ### 配置文件说明
+
+#### 帐号/密码：
 
 可以将帐号/密码保存到配置文件中（若使用浏览器方式，可以只保存帐号），这样就不用在每次登录时手动输入了（虽然使用了 cookie 保存登录状态，但京东还是会每隔几天就让你重新登录的...）。
 
@@ -75,6 +75,35 @@ pip install -r requirements.txt
 >>> base64.b85encode(b'username').decode()
 'b#rBMZeeX@'
 ```
+
+#### 我没有小白卡/我想跳过某些任务：
+
+将想要跳过的任务填写到配置文件中的 `jobs_skip` 中即可。比如想跳过「小白卡钢镚打卡」任务，填写 `Daka` 即可：
+
+```json
+"jobs_skip": ["Daka"]
+```
+
+跳过多个任务:
+
+```json
+"jobs_skip": ["DataStation", "Daka"]  
+```
+
+任务列表:
+
+| 任务 | 描述 |
+| --- | --- |
+| DaKa | 小白卡钢镚打卡 |
+| DakaApp | 京东客户端钢镚打卡 |
+| BeanApp | 京东客户端签到领京豆 |
+| Bean | 京东会员页签到领京豆 |
+| BeanJR | 京东金融签到领京豆 |
+| DataStation | 流量加油站签到领流量 |
+| RedPacket | 京东小金库现金红包 |
+
+<br>
+
 
 ### 设置网络代理
 

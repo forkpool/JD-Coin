@@ -1,5 +1,4 @@
 import argparse
-import getpass
 import json
 import logging
 import sys
@@ -14,12 +13,14 @@ class Config:
     def __init__(self):
         self.debug = False
         self.log_format = log_format
-        self.ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:51.0) Gecko/20100101 Firefox/51.0'
+        self.ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:52.0) Gecko/20100101 Firefox/52.0'
 
-        self.qq = {
-            'account': '',
+        self.jd = {
+            'username': '',
             'password': ''
         }
+
+        self.jobs_skip = []
 
     @classmethod
     def load(cls, d):
@@ -28,17 +29,23 @@ class Config:
         the_config.debug = d.get('debug', False)
 
         try:
-            the_config.qq = {
-                'account': b85decode(d['qq']['account']).decode(),
-                'password': b85decode(d['qq']['password']).decode()
+            the_config.jd = {
+                'username': b85decode(d['jd']['username']).decode(),
+                'password': b85decode(d['jd']['password']).decode()
             }
         except Exception as e:
-            logging.error('获取 QQ 帐号出错: ' + repr(e))
+            logging.error('获取京东帐号出错: ' + repr(e))
 
-        if not (the_config.qq['account'] and the_config.qq['password']):
-            print('用户名/密码未找到, 请手动输入: ')
-            the_config.qq['account'] = input('QQ 账号: ')
-            the_config.qq['password'] = getpass.getpass('QQ 密码: ')
+        if not (the_config.jd['username'] and the_config.jd['password']):
+            # 有些页面操作还是有用的, 比如移动焦点到输入框... 滚动页面到登录表单位置等
+            # 所以不禁止 browser 的 auto_login 动作了, 但两项都有才自动提交, 否则只进行自动填充动作
+            the_config.jd['auto_submit'] = 0  # used in js
+            logging.info('用户名/密码未找到, 自动登录功能将不可用.')
+
+        else:
+            the_config.jd['auto_submit'] = 1
+
+        the_config.jobs_skip = d.get('jobs_skip', [])
 
         return the_config
 

@@ -1,7 +1,7 @@
+import json
 import random
-import traceback
 
-import util
+from .common import RequestError
 from .daka import Daka
 
 
@@ -11,70 +11,83 @@ class BeanApp(Daka):
     """
     job_name = '京东客户端签到领京豆'
 
-    index_url = 'https://ld.m.jd.com/userBeanHomePage/getLoginUserBean.action'
-    sign_url = 'https://ld.m.jd.com/SignAndGetBeansN/signStart.action'
-    poker_url = 'https://ld.m.jd.com/card/getCardResult.action'
+    index_url = 'https://bean.m.jd.com'
+    info_url = 'https://api.m.jd.com/client.action?functionId=queryBeanIndex'
+    sign_url = 'https://api.m.jd.com/client.action?functionId=signBeanStart'
+    test_url = 'https://home.m.jd.com'
+    poker_url = 'https://api.m.jd.com/client.action?functionId=getCardResult'
 
-    test_url = index_url
+    client_info = {
+        'client': 'ld',
+        'clientVersion': '1.0.0'
+    }
 
     def is_signed(self):
-        r = self.session.get(self.index_url)
-        signed = False
+        try:
+            data = self.fetch_data(self.info_url)
+        except RequestError as e:
+            self.logger.error('签到信息获取失败: {}'.format(e.message))
+            return False
 
-        if r.ok:
-            sign_pattern = r'"signStatval".*?value="(\d+)"'
-            days_pattern = r'"signNum".*?value="(\d+)"'
-            dou_pattern = r'"dou".*?value="(\d+)"'
+        # 根据测试, 2 表示已签到, 4 表示未签到, 5 表示未登录
+        signed = (data['status'] == '2')
+        sign_days = int(data['continuousDays'])
+        beans_count = int(data['totalUserBean'])
 
-            try:
-                # https://h.360buyimg.com/getbean/js/jdBeanNew.js
-                # 2 表示已签到, 4 表示未签到
-                signed = ('2' == util.find_value(sign_pattern, r.text))
-                sign_days = util.find_value(days_pattern, r.text)
-                dou_count = util.find_value(dou_pattern, r.text)
-                self.logger.info('今日已签到: {}; 签到天数: {}; 现有京豆: {}'.format(signed, sign_days, dou_count))
-
-            except Exception as e:
-                self.logger.error('返回数据结构可能有变化, 获取签到数据失败: {}'.format(e))
-                traceback.print_exc()
-
+        self.logger.info('今日已签到: {}; 签到天数: {}; 现有京豆: {}'.format(signed, sign_days, beans_count))
         return signed
 
     def sign(self):
-        r = self.session.get(self.sign_url)
-        sign_success = False
+        try:
+            data = self.fetch_data(self.sign_url)
+        except RequestError as e:
+            self.logger.error('签到失败: {}'.format(e.message))
+            return False
 
-        if r.ok:
-            as_json = r.json()
-            sign_success = (as_json['status'] == 1)
-            message = as_json['signText']
-            self.logger.info('签到成功: {}; Message: {}'.format(sign_success, message))
+        sign_success = (data['status'] == '1')
+        message = data['signShowBean']['signText']
+        message = message.replace('signAward', data['signShowBean']['signAward'])
+        self.logger.info('签到成功: {}; Message: {}'.format(sign_success, message))
 
-            poker = as_json['poker']
-            # "complated": 原文如此, 服务端的拼写错误...
-            poker_picked = poker['complated']
+        poker = data['signShowBean']
+        # "complated": 原文如此, 服务端的拼写错误...
+        poker_picked = poker['complated']
 
-            if not poker_picked:
-                self.pick_poker(poker)
-
-        else:
-            self.logger.error('签到失败: Status code: {}; Reason: {}'.format(r.status_code, r.reason))
+        if not poker_picked:
+            pick_success = self.pick_poker(poker)
+            # 同时成功才视为签到成功
+            sign_success &= pick_success
 
         return sign_success
 
     def pick_poker(self, poker):
         poker_to_pick = random.randint(1, len(poker['awardList']))
-        r = self.session.get(self.poker_url, params={'index': poker_to_pick})
-        pick_success = False
+
+        try:
+            payload = {'body': json.dumps({'index': poker_to_pick})}
+            data = self.fetch_data(self.poker_url, payload=payload)
+        except RequestError as e:
+            self.logger.error('翻牌失败: {}'.format(e.message))
+            return False
+
+        message = data['signText'].replace('signAward', data['signAward'])
+        self.logger.info('翻牌成功: {}'.format(message))
+        return True
+
+    def fetch_data(self, url, payload=None):
+        payload = {**payload, **self.client_info} if payload else self.client_info
+
+        r = self.session.get(url, params=payload)
 
         try:
             as_json = r.json()
-            pick_success = (as_json['drawStatus'] == 0)
-            message = as_json.get('signText') or as_json['drawText']
-            self.logger.info('翻牌成功: {}; Message: {}'.format(pick_success, message))
+        except ValueError:
+            raise RequestError('unexpected response: url: {}; http code: {}'.format(url, r.status_code), response=r)
 
-        except Exception as e:
-            self.logger.error('翻牌失败: {}'.format(e))
-            traceback.print_exc()
+        if as_json['code'] != '0' or 'errorCode' in as_json or 'errorMessage' in as_json:
+            error_msg = as_json.get('echo') or as_json.get('errorMessage') or str(as_json)
+            error_code = as_json.get('errorCode') or as_json.get('code')
+            raise RequestError(error_msg, code=error_code, response=r)
 
-        return pick_success
+        # 请求成功
+        return as_json['data']

@@ -1,7 +1,8 @@
 {
   "debug": false,
-  "qq": {
-    "account": "",
+  "jd": {
+    "username": "",
     "password": ""
-  }
+  },
+  "jobs_skip": ["DataStation"]
 }

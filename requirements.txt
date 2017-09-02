@@ -1,2 +1,2 @@
 requests
-qqlib==1.1.1
+PyQT5
